@@ -1,66 +1,70 @@
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-// Add this near the top of your file to use Railway's PORT environment variable
+// Configure PORT
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://*:{port}");
 
-Console.WriteLine("Application starting...");
-
-// Ensure directories exist
+// Ensure directories BEFORE configuring database
 EnsureDirectoriesExist();
 Console.WriteLine("Directories created");
 
+// Configure database BEFORE Umbraco builder
+string dbPath = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "Umbraco.sqlite.db");
+builder.Configuration["ConnectionStrings:umbracoDbDSN"] = $"Data Source={dbPath};Cache=Shared;Foreign Keys=True;Pooling=True";
+Console.WriteLine($"Using database at: {dbPath}");
+
+// Create Umbraco builder
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
     .AddWebsite()
     .AddComposers()
     .Build();
 
-builder.Services.AddCors(options =>
+// Build app
+var app = builder.Build();
+
+// Error handling first
+if (!app.Environment.IsDevelopment())
 {
-    options.AddPolicy("AllowStaticSite", builder =>
-    {
-        builder.WithOrigins("https://yourusername.github.io")
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
+    app.UseExceptionHandler("/error");
+}
 
-WebApplication app = builder.Build();
-
-string dbPath = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "Umbraco.sqlite.db");
-Console.WriteLine($"Using database at: {dbPath}");
-builder.Configuration["ConnectionStrings:umbracoDbDSN"] = $"Data Source={dbPath};Cache=Shared;Foreign Keys=True;Pooling=True";
-
-// And in the Configure section
+// CORS
 app.UseCors("AllowStaticSite");
-await app.BootUmbracoAsync();
 
+// Health endpoint
 app.MapGet("/health", () => {
-    Console.WriteLine("Health endpoint accessed!");
     return "Application is running!";
 });
 
+// Diagnostic middleware
 app.Use(async (context, next) => {
     Console.WriteLine($"Request received: {context.Request.Method} {context.Request.Path}");
-    await next();
+    try {
+        await next();
+    }
+    catch (Exception ex) {
+        Console.WriteLine($"ERROR: {ex.Message}");
+        throw;
+    }
     Console.WriteLine($"Response status: {context.Response.StatusCode}");
 });
 
+// Boot Umbraco
+await app.BootUmbracoAsync();
+
+// Configure Umbraco
 app.UseUmbraco()
-    .WithMiddleware(u =>
-    {
+    .WithMiddleware(u => {
         u.UseBackOffice();
         u.UseWebsite();
     })
-    .WithEndpoints(u =>
-    {
+    .WithEndpoints(u => {
         u.UseBackOfficeEndpoints();
         u.UseWebsiteEndpoints();
     });
 
 await app.RunAsync();
-
 // Helper method to ensure directories exist
 static void EnsureDirectoriesExist()
 {
