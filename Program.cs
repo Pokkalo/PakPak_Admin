@@ -1,5 +1,8 @@
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// Ensure directories exist
+EnsureDirectoriesExist();
+
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
     .AddWebsite()
@@ -16,13 +19,11 @@ builder.Services.AddCors(options =>
     });
 });
 
-
 WebApplication app = builder.Build();
 
 // And in the Configure section
 app.UseCors("AllowStaticSite");
 await app.BootUmbracoAsync();
-
 
 app.UseUmbraco()
     .WithMiddleware(u =>
@@ -37,3 +38,26 @@ app.UseUmbraco()
     });
 
 await app.RunAsync();
+
+// Helper method to ensure directories exist
+static void EnsureDirectoriesExist()
+{
+    var requiredDirectories = new[]
+    {
+        "wwwroot/media",
+        "wwwroot/css",
+        "wwwroot/js",
+        "App_Data/TEMP",
+        "App_Plugins"
+    };
+
+    foreach (var dir in requiredDirectories)
+    {
+        var path = Path.Combine(Directory.GetCurrentDirectory(), dir);
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+            Console.WriteLine($"Created directory: {path}");
+        }
+    }
+}
