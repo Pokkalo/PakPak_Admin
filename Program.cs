@@ -4,9 +4,11 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://*:{port}");
 
+Console.WriteLine("Application starting...");
 
 // Ensure directories exist
 EnsureDirectoriesExist();
+Console.WriteLine("Directories created");
 
 builder.CreateUmbracoBuilder()
     .AddBackOffice()
@@ -26,9 +28,24 @@ builder.Services.AddCors(options =>
 
 WebApplication app = builder.Build();
 
+string dbPath = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "Umbraco.sqlite.db");
+Console.WriteLine($"Using database at: {dbPath}");
+builder.Configuration["ConnectionStrings:umbracoDbDSN"] = $"Data Source={dbPath};Cache=Shared;Foreign Keys=True;Pooling=True";
+
 // And in the Configure section
 app.UseCors("AllowStaticSite");
 await app.BootUmbracoAsync();
+
+app.MapGet("/health", () => {
+    Console.WriteLine("Health endpoint accessed!");
+    return "Application is running!";
+});
+
+app.Use(async (context, next) => {
+    Console.WriteLine($"Request received: {context.Request.Method} {context.Request.Path}");
+    await next();
+    Console.WriteLine($"Response status: {context.Response.StatusCode}");
+});
 
 app.UseUmbraco()
     .WithMiddleware(u =>
