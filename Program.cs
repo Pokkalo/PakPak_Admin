@@ -1,5 +1,10 @@
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// Add this near the top of your file to use Railway's PORT environment variable
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://*:{port}");
+
+
 // Ensure directories exist
 EnsureDirectoriesExist();
 

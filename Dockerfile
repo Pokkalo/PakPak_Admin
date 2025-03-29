@@ -16,6 +16,8 @@ COPY --from=publish /app/publish .
 RUN mkdir -p /app/wwwroot/media /app/wwwroot/css /app/wwwroot/js /app/App_Data/TEMP /app/App_Plugins
 RUN chmod -R 777 /app/wwwroot/media /app/App_Data
 
-EXPOSE 8080
+# Make sure these lines are present at the end
+ENV PORT=8080
 ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "PakPak_Admin.dll"]
