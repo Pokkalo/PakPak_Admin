@@ -8,6 +8,9 @@ builder.CreateUmbracoBuilder()
 
 WebApplication app = builder.Build();
 
+// Add before app.UseUmbraco()
+app.MapGet("/healthz", () => "OK");
+
 await app.BootUmbracoAsync();
 
 

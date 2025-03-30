@@ -1,52 +1,40 @@
-# Build stage
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy csproj and restore dependencies
+# Copy project files for better layer caching
 COPY ["PakPak_Admin.csproj", "./"]
 RUN dotnet restore "PakPak_Admin.csproj"
 
-# Copy all source code
+# Copy remaining files
 COPY . .
-
-# Build the application
 RUN dotnet build "PakPak_Admin.csproj" -c Release -o /app/build
-
-# Publish the application
-FROM build AS publish
 RUN dotnet publish "PakPak_Admin.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
-# Set proper permissions for Umbraco
-USER root
+# Install curl for healthchecks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Create required Umbraco directories with appropriate permissions
+# Create required directories
 RUN mkdir -p /app/wwwroot/media /app/wwwroot/css /app/wwwroot/js /app/App_Data/TEMP /app/App_Plugins
-
-# Copy published files from build stage
-COPY --from=publish /app/publish .
-
-# Ensure necessary directories have correct permissions
+COPY --from=build /app/publish .
 RUN chmod -R 777 /app/wwwroot/media /app/App_Data
 
-# Configure environment variables
-ENV ASPNETCORE_URLS=http://+:80
+# Railway specific configuration
+ENV PORT=8080
+ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 ENV UMBRACO_CMS_GLOBAL__INSTALLMISSINGDATABASE=true
-
-# Set DataDirectory path for SQLite
 ENV DataDirectory=/app/App_Data
+ENV UMBRACO__CMS__HOSTING__DEBUG=false
+ENV UMBRACO__CMS__HOSTING__LOCALHOSTREDIRECTENABLED=false
 
-# Expose port
-EXPOSE 80
+EXPOSE 8080
 
-# Set healthcheck
-HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:80/ || exit 1
+# Add simple healthcheck
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/healthz || exit 1
 
-# Start the application
 ENTRYPOINT ["dotnet", "PakPak_Admin.dll"]
