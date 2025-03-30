@@ -9,7 +9,17 @@ builder.CreateUmbracoBuilder()
 WebApplication app = builder.Build();
 
 // Add before app.UseUmbraco()
-app.MapGet("/healthz", () => "OK");
+app.MapGet("/healthz", () => {
+    try {
+        // Just basic functionality check, no Umbraco dependency
+        Console.WriteLine("Health endpoint accessed");
+        return Results.Ok("Healthy");
+    }
+    catch (Exception ex) {
+        Console.WriteLine($"Health check failed: {ex.Message}");
+        return Results.StatusCode(500);
+    }
+});
 
 await app.BootUmbracoAsync();
 
